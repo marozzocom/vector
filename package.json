@@ -1,0 +1,39 @@
+{
+	"name": "vector",
+	"private": true,
+	"version": "0.0.0",
+	"type": "module",
+	"scripts": {
+		"dev": "vite",
+		"build": "tsc -b && vite build",
+		"lint": "eslint .",
+		"preview": "vite preview"
+	},
+	"dependencies": {
+		"@linaria/core": "^6.2.0",
+		"@linaria/react": "^6.2.1",
+		"@wyw-in-js/babel-preset": "^0.5.4",
+		"lucide-react": "^0.437.0",
+		"react": "^18.3.1",
+		"react-dom": "^18.3.1"
+	},
+	"devDependencies": {
+		"@babel/core": "^7.22.0",
+		"@babel/preset-react": "^7.22.0",
+		"@babel/preset-typescript": "^7.22.0",
+		"@eslint/js": "^9.9.0",
+		"@types/bun": "latest",
+		"@types/react": "^18.3.3",
+		"@types/react-dom": "^18.3.0",
+		"@vitejs/plugin-react-swc": "^3.5.0",
+		"@wyw-in-js/vite": "^0.5.4",
+		"eslint": "^9.9.0",
+		"eslint-plugin-react-hooks": "^5.1.0-rc.0",
+		"eslint-plugin-react-refresh": "^0.4.9",
+		"globals": "^15.9.0",
+		"typescript": "^5.5.3",
+		"typescript-eslint": "^8.0.1",
+		"vite": "^5.4.1"
+	},
+	"module": "index.ts"
+}
