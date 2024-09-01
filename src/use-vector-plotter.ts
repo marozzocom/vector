@@ -3,6 +3,15 @@ import { useCallback, useEffect, useState, type RefObject } from "react";
 // Vector type and operations
 type Vector = { x: number; y: number };
 
+// Plotted vector type
+type PlottedVector = {
+	vector: Vector;
+	color: string;
+};
+
+// Shapes type
+type Shapes = Array<Array<PlottedVector>>;
+
 const createVector = (x: number, y: number): Vector => ({ x, y });
 
 const addVectors = (v1: Vector, v2: Vector): Vector => ({
@@ -27,18 +36,12 @@ const normalizeVector = (v: Vector): Vector => {
 	return len > 0 ? scaleVector(v, 1 / len) : createVector(0, 0);
 };
 
-// Plotted vector type
-type PlottedVector = {
-	vector: Vector;
-	color: string;
-};
-
 const useVectorPlotter = (
 	canvasRef: RefObject<HTMLCanvasElement>,
 	scale = 50,
 ) => {
 	const [ctx, setCtx] = useState<CanvasRenderingContext2D | null>(null);
-	const [shapes, setShapes] = useState<Array<Array<PlottedVector>>>([]);
+	const [shapes, setShapes] = useState<Shapes>([]);
 	const [selectedShape, setSelectedShape] = useState<number | null>(null);
 
 	const selectShape = (index: number) => {
@@ -227,6 +230,45 @@ const useVectorPlotter = (
 		return createVector((x - centerX) / scale, (centerY - y) / scale);
 	};
 
+	const serializeToSVG = (width = 500, height = 500): string => {
+		const svgHeader = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`;
+		const svgFooter = "</svg>";
+
+		// Function to scale coordinates to fit the SVG viewBox
+		const scaleCoordinate = (value: number, max: number): number => {
+			return (value / max) * (width < height ? width : height) * 0.5;
+		};
+
+		// Find the maximum absolute value for x and y coordinates
+		const maxValue = shapes.flat().reduce((max, vector) => {
+			return Math.max(
+				max,
+				Math.abs(vector.vector.x),
+				Math.abs(vector.vector.y),
+			);
+		}, 0);
+
+		// Generate path elements for each shape
+		const pathElements = shapes
+			.map((shape) => {
+				if (shape.length === 0) return "";
+
+				const pathData = shape
+					.map((plotted, index) => {
+						const x = scaleCoordinate(plotted.vector.x, maxValue) + width / 2;
+						const y = height / 2 - scaleCoordinate(plotted.vector.y, maxValue);
+						return `${index === 0 ? "M" : "L"} ${x.toFixed(2)} ${y.toFixed(2)}`;
+					})
+					.join(" ");
+
+				return `<path d="${pathData}" stroke="${shape[0].color}" fill="none" />`;
+			})
+			.join("\n");
+
+		// Combine all elements
+		return `${svgHeader}\n${pathElements}\n${svgFooter}`;
+	};
+
 	return {
 		addVector,
 		clearVectors,
@@ -246,6 +288,7 @@ const useVectorPlotter = (
 		translateShape,
 		rotateShape,
 		duplicateShape,
+		serializeToSVG,
 	};
 };
 

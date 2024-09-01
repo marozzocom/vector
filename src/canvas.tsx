@@ -12,6 +12,7 @@ import {
 	ArrowBigRight,
 	ArrowBigUp,
 	Copy,
+	Download,
 	Expand,
 	Plus,
 	RotateCcw,
@@ -76,6 +77,16 @@ const StyledButton = styled.button`
 	}
 `;
 
+const StyledTextarea = styled.textarea`
+	border: none;
+	border-radius: 0.5rem;
+	box-shadow: 0 0 0.5rem rgba(0, 0, 0, 0.1);
+	font-family: monospace;
+	font-size: 0.8rem;
+	height: 10rem;
+	width: 100%;
+`;
+
 type SelectableButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 	selected: boolean;
 };
@@ -87,6 +98,9 @@ const SelectableButton = styled(StyledButton)<SelectableButtonProps>`
 const App = () => {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const [zoom, setZoom] = useState(DEFAULT_ZOOM);
+	const [exportOpen, setExportOpen] = useState(false);
+
+	const toggleExport = () => setExportOpen((prev) => !prev);
 
 	const {
 		addVector,
@@ -102,6 +116,7 @@ const App = () => {
 		translateShape,
 		rotateShape,
 		duplicateShape,
+		serializeToSVG,
 	} = useVectorPlotter(canvasRef, zoom);
 
 	const handleAddShape = () => {
@@ -123,7 +138,13 @@ const App = () => {
 	};
 
 	const handleAddVector: MouseEventHandler<HTMLCanvasElement> = (event) => {
-		if (!canvasRef.current || selectedShape === null) {
+		if (!canvasRef.current) {
+			return;
+		}
+
+		if (selectedShape === null) {
+			const index = addShape();
+			selectShape(index);
 			return;
 		}
 
@@ -239,7 +260,15 @@ const App = () => {
 					>
 						<ZoomOut />
 					</StyledButton>
+					<StyledButton onClick={toggleExport} type="button">
+						<Download />
+					</StyledButton>
 				</Panel>
+				{exportOpen && (
+					<Panel>
+						<StyledTextarea readOnly value={serializeToSVG()} />
+					</Panel>
+				)}
 				{shapes.length > 0 && (
 					<Panel>
 						{shapes.map((_, index) => (
