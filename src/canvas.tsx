@@ -221,6 +221,9 @@ const App = () => {
 	const handleClear = () => {
 		deselectShape();
 		clearVectors();
+
+		debounceRef.current = null;
+
 		setZoom(DEFAULT_ZOOM);
 	};
 
