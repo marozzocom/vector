@@ -1,9 +1,4 @@
-import {
-	useRef,
-	useState,
-	type ButtonHTMLAttributes,
-	type MouseEventHandler,
-} from "react";
+import { useCallback, useRef, useState, type MouseEventHandler } from "react";
 import { styled } from "@linaria/react";
 import { useVectorPlotter } from "./use-vector-plotter";
 import {
@@ -14,18 +9,46 @@ import {
 	Copy,
 	Download,
 	Expand,
+	FilePlus,
+	Pencil,
+	PenTool,
 	Plus,
 	RotateCcw,
 	RotateCw,
 	Shrink,
-	Trash,
 	Trash2,
 	ZoomIn,
 	ZoomOut,
 } from "lucide-react";
 
+const debounce = <T extends unknown[]>(
+	func: (...args: T) => void,
+	wait = 200,
+) => {
+	let timeout: ReturnType<typeof setTimeout> | null = null;
+
+	return (...args: T) => {
+		const later = () => {
+			// biome-ignore lint/style/noNonNullAssertion: <explanation>
+			clearTimeout(timeout!);
+			func(...args);
+		};
+
+		if (timeout !== null) {
+			clearTimeout(timeout);
+		}
+		timeout = setTimeout(later, wait);
+	};
+};
+
 const DEFAULT_ZOOM = 50;
 const TRANSLATION_STEP = 0.5;
+const DEBOUNCE_RATE = 7;
+
+const Separator = styled.div`
+	border-left: 1px solid #ddd;
+	height: 1rem;
+`;
 
 const CanvasContainer = styled.div`
   display: grid;
@@ -61,8 +84,10 @@ const Layout = styled.div`
 	height: 100vh;
 `;
 
-const StyledButton = styled.button`
-	background-color: white;
+const StyledButton = styled.button<{
+	selected?: boolean;
+}>`
+	background-color: ${(props) => (props.selected ? "#f00" : "white")};
 	border:none;
 	border-radius: 0.5rem;
 	box-shadow: 0 0 0.5rem rgba(0, 0, 0, 0.1);
@@ -87,18 +112,13 @@ const StyledTextarea = styled.textarea`
 	width: 100%;
 `;
 
-type SelectableButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
-	selected: boolean;
-};
-
-const SelectableButton = styled(StyledButton)<SelectableButtonProps>`
-	background-color: ${(props) => (props.selected ? "#f00" : "white")};
-`;
-
 const App = () => {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const [zoom, setZoom] = useState(DEFAULT_ZOOM);
 	const [exportOpen, setExportOpen] = useState(false);
+	const [drawingMode, setDrawingMode] = useState<"point" | "freehand">("point");
+
+	const debounceRef = useRef<((e: MouseEvent) => void) | null>();
 
 	const toggleExport = () => setExportOpen((prev) => !prev);
 
@@ -137,6 +157,35 @@ const App = () => {
 		removeShape(selectedShape);
 	};
 
+	const debouncedHandleFreehandDrawing = useCallback(
+		(event: MouseEvent) => {
+			if (!debounceRef.current) {
+				debounceRef.current = debounce((e: MouseEvent) => {
+					if (!canvasRef.current || selectedShape === null) return;
+
+					const xInRelationToCanvas = e.clientX - canvasRef.current.offsetLeft;
+					const yInRelationToCanvas = e.clientY - canvasRef.current.offsetTop;
+
+					const vector = transformPixelToVector(
+						xInRelationToCanvas,
+						yInRelationToCanvas,
+					);
+
+					addVector(selectedShape, vector);
+				}, DEBOUNCE_RATE);
+			}
+			debounceRef.current(event);
+		},
+		[selectedShape, transformPixelToVector, addVector],
+	);
+
+	const stopFreehandDrawing = () => {
+		canvasRef.current?.removeEventListener(
+			"mousemove",
+			debouncedHandleFreehandDrawing,
+		);
+	};
+
 	const handleAddVector: MouseEventHandler<HTMLCanvasElement> = (event) => {
 		if (!canvasRef.current) {
 			return;
@@ -148,16 +197,25 @@ const App = () => {
 			return;
 		}
 
-		const xInRelationToCanvas = event.clientX - canvasRef.current.offsetLeft;
+		if (drawingMode === "point") {
+			const xInRelationToCanvas = event.clientX - canvasRef.current.offsetLeft;
 
-		const yInRelationToCanvas = event.clientY - canvasRef.current.offsetTop;
+			const yInRelationToCanvas = event.clientY - canvasRef.current.offsetTop;
 
-		const vector = transformPixelToVector(
-			xInRelationToCanvas,
-			yInRelationToCanvas,
+			const vector = transformPixelToVector(
+				xInRelationToCanvas,
+				yInRelationToCanvas,
+			);
+
+			addVector(selectedShape, vector);
+			return;
+		}
+
+		canvasRef.current.addEventListener(
+			"mousemove",
+			debouncedHandleFreehandDrawing,
 		);
-
-		addVector(selectedShape, vector);
+		window.addEventListener("mouseup", stopFreehandDrawing);
 	};
 
 	const handleClear = () => {
@@ -238,6 +296,9 @@ const App = () => {
 		duplicateShape(selectedShape);
 	};
 
+	const choosePoint = () => setDrawingMode("point");
+	const chooseFreehand = () => setDrawingMode("freehand");
+
 	return (
 		<Layout>
 			<PanelContainer>
@@ -245,9 +306,22 @@ const App = () => {
 					<StyledButton onClick={handleAddShape} type="button">
 						<Plus />
 					</StyledButton>
-					<StyledButton onClick={handleClear} type="button">
-						<Trash2 />
+					<Separator />
+					<StyledButton
+						onClick={choosePoint}
+						type="button"
+						selected={drawingMode === "point"}
+					>
+						<PenTool />
 					</StyledButton>
+					<StyledButton
+						onClick={chooseFreehand}
+						type="button"
+						selected={drawingMode === "freehand"}
+					>
+						<Pencil />
+					</StyledButton>
+					<Separator />
 					<StyledButton
 						onClick={() => setZoom((prev) => prev + 5)}
 						type="button"
@@ -260,8 +334,13 @@ const App = () => {
 					>
 						<ZoomOut />
 					</StyledButton>
+					<Separator />
 					<StyledButton onClick={toggleExport} type="button">
 						<Download />
+					</StyledButton>
+					<Separator />
+					<StyledButton onClick={handleClear} type="button">
+						<FilePlus />
 					</StyledButton>
 				</Panel>
 				{exportOpen && (
@@ -272,7 +351,7 @@ const App = () => {
 				{shapes.length > 0 && (
 					<Panel>
 						{shapes.map((_, index) => (
-							<SelectableButton
+							<StyledButton
 								// biome-ignore lint/suspicious/noArrayIndexKey: <explanation>
 								key={index}
 								onClick={() => selectShape(index)}
@@ -280,7 +359,7 @@ const App = () => {
 								selected={selectedShape === index}
 							>
 								{index}
-							</SelectableButton>
+							</StyledButton>
 						))}
 					</Panel>
 				)}
@@ -292,6 +371,7 @@ const App = () => {
 						<StyledButton type="button" onClick={handleMakeBigger}>
 							<Expand />
 						</StyledButton>
+						<Separator />
 						<StyledButton type="button" onClick={handleMoveLeft}>
 							<ArrowBigLeft />
 						</StyledButton>
@@ -304,23 +384,25 @@ const App = () => {
 						<StyledButton type="button" onClick={handleMoveDown}>
 							<ArrowBigDown />
 						</StyledButton>
+						<Separator />
 						<StyledButton type="button" onClick={handleRotateClockwise}>
 							<RotateCw />
 						</StyledButton>
 						<StyledButton type="button" onClick={handleRotateCounterClockwise}>
 							<RotateCcw />
 						</StyledButton>
+						<Separator />
 						<StyledButton onClick={handleDuplicateShape} type="button">
 							<Copy />
 						</StyledButton>
 						<StyledButton onClick={handleRemoveShape} type="button">
-							<Trash />
+							<Trash2 />
 						</StyledButton>
 					</Panel>
 				)}
 			</PanelContainer>
 			<CanvasContainer>
-				<StyledCanvas ref={canvasRef} onClick={handleAddVector} />
+				<StyledCanvas ref={canvasRef} onMouseDown={handleAddVector} />
 			</CanvasContainer>
 		</Layout>
 	);
