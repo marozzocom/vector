@@ -6,7 +6,6 @@ import {
 } from "react";
 import { styled } from "@linaria/react";
 import { useVectorPlotter } from "./use-vector-plotter";
-import { flushSync } from "react-dom";
 import {
 	ArrowBigDown,
 	ArrowBigLeft,
