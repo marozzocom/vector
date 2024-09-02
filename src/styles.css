@@ -4,4 +4,8 @@ body {
   padding: 0;
   background-color: #f0f0f0;
   overscroll-behavior: none;
+  position: fixed;
+  overflow: hidden;
+  width: 100svw;
+  height: 100svh;
 }
