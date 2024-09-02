@@ -10,8 +10,10 @@ type PlottedVector = {
 	opacity?: number;
 };
 
+type Shape = Array<PlottedVector>;
+
 // Shapes type
-type Shapes = Array<Array<PlottedVector>>;
+type Shapes = Array<Shape>;
 
 const createVector = (x: number, y: number): Vector => ({ x, y });
 
@@ -44,10 +46,55 @@ const useVectorPlotter = (
 	const [context, setcontext] = useState<CanvasRenderingContext2D | null>(null);
 	const [shapes, setShapes] = useState<Shapes>([[]]);
 	const [selectedShape, setSelectedShape] = useState<number | null>(0);
+	const [selectedVector, setSelectedVector] = useState<number | null>(null);
 
 	const selectShape = (index: number) => {
 		setSelectedShape(index);
 	};
+
+	const selectVector = (index: number) => {
+		setSelectedVector(index);
+	};
+
+	function distanceToLineSegment(p: Vector, v: Vector, w: Vector): number {
+		const lengthSquared = (w.x - v.x) ** 2 + (w.y - v.y) ** 2;
+		if (lengthSquared === 0)
+			return Math.sqrt((p.x - v.x) ** 2 + (p.y - v.y) ** 2);
+
+		let t =
+			((p.x - v.x) * (w.x - v.x) + (p.y - v.y) * (w.y - v.y)) / lengthSquared;
+		t = Math.max(0, Math.min(1, t));
+
+		const nearestX = v.x + t * (w.x - v.x);
+		const nearestY = v.y + t * (w.y - v.y);
+
+		return Math.sqrt((p.x - nearestX) ** 2 + (p.y - nearestY) ** 2);
+	}
+
+	function selectShapeWithPointer(
+		clickPoint: Vector,
+		threshold: number,
+	): number {
+		for (let i = 0; i < shapes.length; i++) {
+			const shape = shapes[i];
+			for (let j = 0; j < shape.length; j++) {
+				const startPoint = shape[j];
+				const endPoint = shape[(j + 1) % shape.length]; // Wrap around to the first point
+
+				const distance = distanceToLineSegment(
+					clickPoint,
+					startPoint.vector,
+					endPoint.vector,
+				);
+
+				if (distance <= threshold) {
+					return i; // Return the index of the selected shape
+				}
+			}
+		}
+
+		return -1; // No shape selected
+	}
 
 	useEffect(() => {
 		const canvas = canvasRef.current;
@@ -116,18 +163,6 @@ const useVectorPlotter = (
 			}
 		}
 	}, [context, shapes, drawVector, drawConnection, selectedShape]);
-
-	// const drawCoordinateSystem = (context: CanvasRenderingContext2D) => {
-	// 	const { width, height } = context.canvas;
-	// 	context.beginPath();
-	// 	context.moveTo(width / 2, 0);
-	// 	context.lineTo(width / 2, height);
-	// 	context.moveTo(0, height / 2);
-	// 	context.lineTo(width, height / 2);
-	// 	context.strokeStyle = "blue";
-	// 	context.globalAlpha = 0.5;
-	// 	context.stroke();
-	// };
 
 	const drawGrid = (context: CanvasRenderingContext2D) => {
 		const { width, height } = context.canvas;
@@ -304,6 +339,8 @@ const useVectorPlotter = (
 		addShape,
 		selectShape,
 		selectedShape,
+		selectVector,
+		selectedVector,
 		removeShape,
 		deselectShape,
 		scaleShape,
@@ -311,6 +348,7 @@ const useVectorPlotter = (
 		rotateShape,
 		duplicateShape,
 		serializeToSVG,
+		selectShapeWithPointer,
 	};
 };
 

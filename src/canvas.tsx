@@ -11,6 +11,7 @@ import {
 	Download,
 	Expand,
 	FilePlus,
+	MousePointer2,
 	Pencil,
 	PenTool,
 	Plus,
@@ -119,13 +120,13 @@ const StyledTextarea = styled.textarea`
 	width: 100%;
 `;
 
+type Modes = "freehand" | "point" | "selectShape";
+
 const App = () => {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const [zoom, setZoom] = useState(DEFAULT_ZOOM);
 	const [exportOpen, setExportOpen] = useState(false);
-	const [drawingMode, setDrawingMode] = useState<"point" | "freehand">(
-		"freehand",
-	);
+	const [mode, setMode] = useState<Modes>("freehand");
 
 	const debounceRef = useRef<((e: PointerEvent) => void) | null>();
 
@@ -146,6 +147,7 @@ const App = () => {
 		rotateShape,
 		duplicateShape,
 		serializeToSVG,
+		selectShapeWithPointer,
 	} = useVectorPlotter(canvasRef, zoom);
 
 	const handleAddShape = () => {
@@ -210,8 +212,28 @@ const App = () => {
 		resetDebounce();
 	};
 
-	const handleAddVector: MouseEventHandler<HTMLCanvasElement> = (event) => {
+	const handleCanvasInteraction: MouseEventHandler<HTMLCanvasElement> = (
+		event,
+	) => {
 		if (!canvasRef.current) {
+			return;
+		}
+
+		if (mode === "selectShape") {
+			const xInRelationToCanvas = event.clientX - canvasRef.current.offsetLeft;
+			const yInRelationToCanvas = event.clientY - canvasRef.current.offsetTop;
+
+			const vector = transformPixelToVector(
+				xInRelationToCanvas,
+				yInRelationToCanvas,
+			);
+
+			const index = selectShapeWithPointer(vector, 0.1);
+
+			if (index !== -1) {
+				selectShape(index);
+			}
+
 			return;
 		}
 
@@ -221,7 +243,7 @@ const App = () => {
 			return;
 		}
 
-		if (drawingMode === "point") {
+		if (mode === "point") {
 			const xInRelationToCanvas = event.clientX - canvasRef.current.offsetLeft;
 
 			const yInRelationToCanvas = event.clientY - canvasRef.current.offsetTop;
@@ -349,8 +371,9 @@ const App = () => {
 		debounceRef.current = null;
 	};
 
-	const choosePoint = () => setDrawingMode("point");
-	const chooseFreehand = () => setDrawingMode("freehand");
+	const choosePoint = () => setMode("point");
+	const chooseFreehand = () => setMode("freehand");
+	const chooseSelectShape = () => setMode("selectShape");
 
 	return (
 		<Layout>
@@ -361,16 +384,24 @@ const App = () => {
 					</StyledButton>
 					<Separator />
 					<StyledButton
+						onClick={chooseSelectShape}
+						type="button"
+						selected={mode === "selectShape"}
+					>
+						<MousePointer2 />
+					</StyledButton>
+					<Separator />
+					<StyledButton
 						onClick={choosePoint}
 						type="button"
-						selected={drawingMode === "point"}
+						selected={mode === "point"}
 					>
 						<PenTool />
 					</StyledButton>
 					<StyledButton
 						onClick={chooseFreehand}
 						type="button"
-						selected={drawingMode === "freehand"}
+						selected={mode === "freehand"}
 					>
 						<Pencil />
 					</StyledButton>
@@ -393,24 +424,6 @@ const App = () => {
 				{exportOpen && (
 					<Panel>
 						<StyledTextarea readOnly value={serializeToSVG()} />
-					</Panel>
-				)}
-				{shapes.length > 0 && selectedShape !== undefined && (
-					<Panel>
-						<StyledButton type="button" onClick={deselectShape}>
-							<CircleOff />
-						</StyledButton>
-						{shapes.map((_, index) => (
-							<StyledButton
-								// biome-ignore lint/suspicious/noArrayIndexKey: <explanation>
-								key={index}
-								onClick={() => selectShape(index)}
-								type="button"
-								selected={selectedShape === index}
-							>
-								{index}
-							</StyledButton>
-						))}
 					</Panel>
 				)}
 				{selectedShape !== null && (
@@ -445,6 +458,10 @@ const App = () => {
 						<StyledButton onClick={handleDuplicateShape} type="button">
 							<Copy />
 						</StyledButton>
+						<StyledButton type="button" onClick={deselectShape}>
+							<CircleOff />
+						</StyledButton>
+						<Separator />
 						<StyledButton onClick={handleRemoveShape} type="button">
 							<Trash2 />
 						</StyledButton>
@@ -452,7 +469,7 @@ const App = () => {
 				)}
 			</PanelContainer>
 			<CanvasContainer>
-				<StyledCanvas ref={canvasRef} onPointerDown={handleAddVector} />
+				<StyledCanvas ref={canvasRef} onPointerDown={handleCanvasInteraction} />
 			</CanvasContainer>
 		</Layout>
 	);
