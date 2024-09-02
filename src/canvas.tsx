@@ -11,6 +11,7 @@ import {
 	Download,
 	Expand,
 	FilePlus,
+	Menu,
 	MousePointer2,
 	Pencil,
 	PenTool,
@@ -40,7 +41,7 @@ const CanvasContainer = styled.div`
 
 const Panel = styled.div`
 	display: flex;
-	justify-content: center;
+	justify-content: start;
 	gap: 1rem;
 	background-color: rgb(128 128 24 / 0.45);
 	box-shadow: 0 0 0.5rem rgba(0, 0, 0, 0.05);
@@ -57,8 +58,9 @@ const PanelContainer = styled.div`
 	flex-direction: column;
 	gap: 1rem;
 	position: fixed;
-	top: 1rem;
-	left: 1rem;
+	top: 0;
+	left: 0;
+	padding: 1rem;
 `;
 
 const StyledCanvas = styled.canvas`
@@ -106,6 +108,7 @@ const App = () => {
 	const [zoom, setZoom] = useState(DEFAULT_ZOOM);
 	const [exportOpen, setExportOpen] = useState(false);
 	const [mode, setMode] = useState<Modes>("freehand");
+	const [menuOpen, setMenuOpen] = useState(false);
 
 	const toggleExport = () => setExportOpen((prev) => !prev);
 
@@ -126,6 +129,8 @@ const App = () => {
 		serializeToSVG,
 		selectShapeWithPointer,
 	} = useVectorPlotter(canvasRef, zoom);
+
+	const toggleMenu = () => setMenuOpen((prev) => !prev);
 
 	const handleAddShape = () => {
 		if (shapes[shapes.length - 1]?.length === 0) {
@@ -354,109 +359,127 @@ const App = () => {
 
 	return (
 		<Layout>
-			<PanelContainer>
-				<Panel>
-					<StyledButton onClick={handleAddShape} type="button">
-						<Plus />
-					</StyledButton>
-					<Separator />
-					<StyledButton
-						onClick={chooseSelectShape}
-						type="button"
-						selected={mode === "selectShape"}
-					>
-						<MousePointer2 />
-					</StyledButton>
-					<Separator />
-					<StyledButton
-						onClick={choosePoint}
-						type="button"
-						selected={mode === "point"}
-					>
-						<PenTool />
-					</StyledButton>
-					<StyledButton
-						onClick={chooseFreehand}
-						type="button"
-						selected={mode === "freehand"}
-					>
-						<Pencil />
-					</StyledButton>
-					<Separator />
-					<StyledButton onClick={handleZoomIn} type="button">
-						<ZoomIn />
-					</StyledButton>
-					<StyledButton onClick={handleZoomOut} type="button">
-						<ZoomOut />
-					</StyledButton>
-					<Separator />
-					<StyledButton onClick={toggleExport} type="button">
-						<Download />
-					</StyledButton>
-					<Separator />
-					<StyledButton
-						onClick={handleClear}
-						type="button"
-						disabled={disableClear}
-					>
-						<FilePlus />
-					</StyledButton>
-				</Panel>
-				{exportOpen && (
+			{!menuOpen && (
+				<PanelContainer>
 					<Panel>
-						<StyledTextarea readOnly value={serializeToSVG()} />
+						<StyledButton onClick={toggleMenu} type="button">
+							<Menu />
+						</StyledButton>
 					</Panel>
-				)}
-				{selectedShape !== null && (
+				</PanelContainer>
+			)}
+			{menuOpen && (
+				<PanelContainer>
 					<Panel>
-						<StyledButton type="button" onClick={handleMakeSmaller}>
-							<Shrink />
-						</StyledButton>
-						<StyledButton type="button" onClick={handleMakeBigger}>
-							<Expand />
+						<StyledButton onClick={toggleMenu} type="button">
+							<Menu />
 						</StyledButton>
 						<Separator />
-						<StyledButton type="button" onClick={handleMoveLeft}>
-							<ArrowBigLeft />
-						</StyledButton>
-						<StyledButton type="button" onClick={handleMoveRight}>
-							<ArrowBigRight />
-						</StyledButton>
-						<StyledButton type="button" onClick={handleMoveUp}>
-							<ArrowBigUp />
-						</StyledButton>
-						<StyledButton type="button" onClick={handleMoveDown}>
-							<ArrowBigDown />
-						</StyledButton>
-						<Separator />
-						<StyledButton type="button" onClick={handleRotateClockwise}>
-							<RotateCw />
-						</StyledButton>
-						<StyledButton type="button" onClick={handleRotateCounterClockwise}>
-							<RotateCcw />
-						</StyledButton>
-						<Separator />
-						<StyledButton onClick={handleDuplicateShape} type="button">
-							<Copy />
-						</StyledButton>
-						<StyledButton
-							type="button"
-							onClick={handleDeselectShape}
-							disabled={disableDeselect}
-						>
-							<CircleOff />
+						<StyledButton onClick={handleAddShape} type="button">
+							<Plus />
 						</StyledButton>
 						<Separator />
 						<StyledButton
-							onClick={handleRemoveShape}
+							onClick={chooseSelectShape}
 							type="button"
-							disabled={disableRemove}
+							selected={mode === "selectShape"}
 						>
-							<Trash2 />
+							<MousePointer2 />
+						</StyledButton>
+						<Separator />
+						<StyledButton
+							onClick={choosePoint}
+							type="button"
+							selected={mode === "point"}
+						>
+							<PenTool />
+						</StyledButton>
+						<StyledButton
+							onClick={chooseFreehand}
+							type="button"
+							selected={mode === "freehand"}
+						>
+							<Pencil />
+						</StyledButton>
+						<Separator />
+						<StyledButton onClick={handleZoomIn} type="button">
+							<ZoomIn />
+						</StyledButton>
+						<StyledButton onClick={handleZoomOut} type="button">
+							<ZoomOut />
+						</StyledButton>
+						<Separator />
+						<StyledButton onClick={toggleExport} type="button">
+							<Download />
+						</StyledButton>
+						<Separator />
+						<StyledButton
+							onClick={handleClear}
+							type="button"
+							disabled={disableClear}
+						>
+							<FilePlus />
 						</StyledButton>
 					</Panel>
-				)}
-			</PanelContainer>
+					{exportOpen && (
+						<Panel>
+							<StyledTextarea readOnly value={serializeToSVG()} />
+						</Panel>
+					)}
+					{selectedShape !== null && (
+						<Panel>
+							<StyledButton type="button" onClick={handleMakeSmaller}>
+								<Shrink />
+							</StyledButton>
+							<StyledButton type="button" onClick={handleMakeBigger}>
+								<Expand />
+							</StyledButton>
+							<Separator />
+							<StyledButton type="button" onClick={handleMoveLeft}>
+								<ArrowBigLeft />
+							</StyledButton>
+							<StyledButton type="button" onClick={handleMoveRight}>
+								<ArrowBigRight />
+							</StyledButton>
+							<StyledButton type="button" onClick={handleMoveUp}>
+								<ArrowBigUp />
+							</StyledButton>
+							<StyledButton type="button" onClick={handleMoveDown}>
+								<ArrowBigDown />
+							</StyledButton>
+							<Separator />
+							<StyledButton type="button" onClick={handleRotateClockwise}>
+								<RotateCw />
+							</StyledButton>
+							<StyledButton
+								type="button"
+								onClick={handleRotateCounterClockwise}
+							>
+								<RotateCcw />
+							</StyledButton>
+							<Separator />
+							<StyledButton onClick={handleDuplicateShape} type="button">
+								<Copy />
+							</StyledButton>
+							<StyledButton
+								type="button"
+								onClick={handleDeselectShape}
+								disabled={disableDeselect}
+							>
+								<CircleOff />
+							</StyledButton>
+							<Separator />
+							<StyledButton
+								onClick={handleRemoveShape}
+								type="button"
+								disabled={disableRemove}
+							>
+								<Trash2 />
+							</StyledButton>
+						</Panel>
+					)}
+				</PanelContainer>
+			)}
 			<CanvasContainer>
 				<StyledCanvas ref={canvasRef} onPointerDown={handleCanvasInteraction} />
 			</CanvasContainer>
