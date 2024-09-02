@@ -23,30 +23,9 @@ import {
 	ZoomOut,
 } from "lucide-react";
 
-const debounce = <T extends unknown[]>(
-	func: (...args: T) => void,
-	wait = 200,
-) => {
-	let timeout: ReturnType<typeof setTimeout> | null = null;
-
-	return (...args: T) => {
-		const later = () => {
-			// biome-ignore lint/style/noNonNullAssertion: <explanation>
-			clearTimeout(timeout!);
-			func(...args);
-		};
-
-		if (timeout !== null) {
-			clearTimeout(timeout);
-		}
-		timeout = setTimeout(later, wait);
-	};
-};
-
 const DEFAULT_ZOOM = 50;
 const ZOOM_STEP = 5;
 const TRANSLATION_STEP = 0.5;
-const DEBOUNCE_RATE = 7;
 
 const Separator = styled.div`
 	border-left: 1px solid rgb(0, 0, 0, 0.25);
@@ -128,8 +107,6 @@ const App = () => {
 	const [exportOpen, setExportOpen] = useState(false);
 	const [mode, setMode] = useState<Modes>("freehand");
 
-	const debounceRef = useRef<((e: PointerEvent) => void) | null>();
-
 	const toggleExport = () => setExportOpen((prev) => !prev);
 
 	const {
@@ -157,7 +134,6 @@ const App = () => {
 
 		const index = addShape();
 		selectShape(index);
-		resetDebounce();
 	};
 
 	const handleRemoveShape = () => {
@@ -177,46 +153,56 @@ const App = () => {
 		}
 
 		removeShape(selectedShape);
-		resetDebounce();
 	};
 
 	const handleDeselectShape = () => {
 		deselectShape();
-		resetDebounce();
+
 		setMode("selectShape");
 	};
 
-	const debouncedHandleFreehandDrawing = useCallback(
-		(event: PointerEvent) => {
-			if (debounceRef.current) {
-				debounceRef.current(event);
+	const handleFreehandDrawing = useCallback(
+		(event: PointerEvent | TouchEvent) => {
+			if (!canvasRef.current || selectedShape === null || mode !== "freehand") {
 				return;
 			}
 
-			debounceRef.current = debounce((e: PointerEvent) => {
-				if (!canvasRef.current || selectedShape === null) return;
+			const getCoordinates = (e: PointerEvent | TouchEvent) => {
+				if (!canvasRef.current) return { x: 0, y: 0 };
+				const canvas = canvasRef.current;
+				const rect = canvas.getBoundingClientRect();
+				const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
+				const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
+				return {
+					x: clientX - rect.left,
+					y: clientY - rect.top,
+				};
+			};
 
-				const xInRelationToCanvas = e.clientX - canvasRef.current.offsetLeft;
-				const yInRelationToCanvas = e.clientY - canvasRef.current.offsetTop;
+			const { x, y } = getCoordinates(event);
+			const vector = transformPixelToVector(x, y);
 
-				const vector = transformPixelToVector(
-					xInRelationToCanvas,
-					yInRelationToCanvas,
-				);
+			// requestAnimationFrame(() => {
+			addVector(selectedShape, vector);
+			// Add any additional redraw logic here if needed
+			// });
 
-				addVector(selectedShape, vector);
-			}, DEBOUNCE_RATE);
+			if (event.cancelable) {
+				event.preventDefault();
+			}
 		},
-		[selectedShape, transformPixelToVector, addVector],
+		[selectedShape, transformPixelToVector, addVector, mode],
 	);
 
-	const stopFreehandDrawing = () => {
-		canvasRef.current?.removeEventListener(
-			"pointermove",
-			debouncedHandleFreehandDrawing,
-		);
-		resetDebounce();
-	};
+	const startFreehandDrawing = useCallback(() => {
+		window.addEventListener("pointermove", handleFreehandDrawing);
+		window.addEventListener("touchmove", handleFreehandDrawing);
+	}, [handleFreehandDrawing]);
+
+	const stopFreehandDrawing = useCallback(() => {
+		window.removeEventListener("pointermove", handleFreehandDrawing);
+		window.removeEventListener("touchmove", handleFreehandDrawing);
+	}, [handleFreehandDrawing]);
 
 	const handleCanvasInteraction: MouseEventHandler<HTMLCanvasElement> = (
 		event,
@@ -263,21 +249,18 @@ const App = () => {
 			return;
 		}
 
-		canvasRef.current.addEventListener(
-			"pointermove",
-			debouncedHandleFreehandDrawing,
-		);
-
-		window.addEventListener("pointerup", stopFreehandDrawing);
-		resetDebounce();
+		if (mode === "freehand") {
+			startFreehandDrawing();
+			window.addEventListener("pointerup", stopFreehandDrawing, { once: true });
+			window.addEventListener("touchend", stopFreehandDrawing, { once: true });
+		}
 	};
 
 	const handleClear = () => {
-		deselectShape();
+		selectShape(0);
 		clearVectors();
 
 		setZoom(DEFAULT_ZOOM);
-		resetDebounce();
 	};
 
 	const handleMakeSmaller = () => {
@@ -286,7 +269,6 @@ const App = () => {
 		}
 
 		scaleShape(selectedShape, 0.9);
-		resetDebounce();
 	};
 
 	const handleMakeBigger = () => {
@@ -295,7 +277,6 @@ const App = () => {
 		}
 
 		scaleShape(selectedShape, 1.1);
-		resetDebounce();
 	};
 
 	const handleMoveUp = () => {
@@ -304,7 +285,6 @@ const App = () => {
 		}
 
 		translateShape(selectedShape, { x: 0, y: TRANSLATION_STEP });
-		resetDebounce();
 	};
 
 	const handleMoveRight = () => {
@@ -313,7 +293,6 @@ const App = () => {
 		}
 
 		translateShape(selectedShape, { x: TRANSLATION_STEP, y: 0 });
-		resetDebounce();
 	};
 
 	const handleMoveDown = () => {
@@ -322,7 +301,6 @@ const App = () => {
 		}
 
 		translateShape(selectedShape, { x: 0, y: -TRANSLATION_STEP });
-		resetDebounce();
 	};
 
 	const handleMoveLeft = () => {
@@ -331,7 +309,6 @@ const App = () => {
 		}
 
 		translateShape(selectedShape, { x: -TRANSLATION_STEP, y: 0 });
-		resetDebounce();
 	};
 
 	const handleRotateClockwise = () => {
@@ -340,7 +317,6 @@ const App = () => {
 		}
 
 		rotateShape(selectedShape, -Math.PI / 8);
-		resetDebounce();
 	};
 
 	const handleRotateCounterClockwise = () => {
@@ -349,7 +325,6 @@ const App = () => {
 		}
 
 		rotateShape(selectedShape, Math.PI / 8);
-		resetDebounce();
 	};
 
 	const handleDuplicateShape = () => {
@@ -358,28 +333,24 @@ const App = () => {
 		}
 
 		duplicateShape(selectedShape);
-		resetDebounce();
 	};
 
 	const handleZoomIn = () => {
 		setZoom((prev) => prev + ZOOM_STEP);
-
-		resetDebounce();
 	};
 
 	const handleZoomOut = () => {
 		setZoom((prev) => prev - ZOOM_STEP);
-
-		resetDebounce();
-	};
-
-	const resetDebounce = () => {
-		debounceRef.current = null;
 	};
 
 	const choosePoint = () => setMode("point");
 	const chooseFreehand = () => setMode("freehand");
 	const chooseSelectShape = () => setMode("selectShape");
+
+	const disableClear = shapes.length === 1 && shapes[0].length === 0;
+	const disableRemove =
+		selectedShape === null || (shapes.length === 1 && shapes[0].length === 0);
+	const disableDeselect = selectedShape === null;
 
 	return (
 		<Layout>
@@ -423,7 +394,11 @@ const App = () => {
 						<Download />
 					</StyledButton>
 					<Separator />
-					<StyledButton onClick={handleClear} type="button">
+					<StyledButton
+						onClick={handleClear}
+						type="button"
+						disabled={disableClear}
+					>
 						<FilePlus />
 					</StyledButton>
 				</Panel>
@@ -464,11 +439,19 @@ const App = () => {
 						<StyledButton onClick={handleDuplicateShape} type="button">
 							<Copy />
 						</StyledButton>
-						<StyledButton type="button" onClick={handleDeselectShape}>
+						<StyledButton
+							type="button"
+							onClick={handleDeselectShape}
+							disabled={disableDeselect}
+						>
 							<CircleOff />
 						</StyledButton>
 						<Separator />
-						<StyledButton onClick={handleRemoveShape} type="button">
+						<StyledButton
+							onClick={handleRemoveShape}
+							type="button"
+							disabled={disableRemove}
+						>
 							<Trash2 />
 						</StyledButton>
 					</Panel>

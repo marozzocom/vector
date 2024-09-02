@@ -280,7 +280,7 @@ const useVectorPlotter = (
 	);
 
 	const clearVectors = () => {
-		setShapes([]);
+		setShapes([[]]);
 	};
 
 	const deselectShape = () => {
