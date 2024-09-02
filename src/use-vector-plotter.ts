@@ -6,7 +6,8 @@ type Vector = { x: number; y: number };
 // Plotted vector type
 type PlottedVector = {
 	vector: Vector;
-	color: string;
+	color?: string;
+	opacity?: number;
 };
 
 // Shapes type
@@ -40,9 +41,9 @@ const useVectorPlotter = (
 	canvasRef: RefObject<HTMLCanvasElement>,
 	scale = 50,
 ) => {
-	const [ctx, setCtx] = useState<CanvasRenderingContext2D | null>(null);
-	const [shapes, setShapes] = useState<Shapes>([]);
-	const [selectedShape, setSelectedShape] = useState<number | null>(null);
+	const [context, setcontext] = useState<CanvasRenderingContext2D | null>(null);
+	const [shapes, setShapes] = useState<Shapes>([[]]);
+	const [selectedShape, setSelectedShape] = useState<number | null>(0);
 
 	const selectShape = (index: number) => {
 		setSelectedShape(index);
@@ -55,7 +56,7 @@ const useVectorPlotter = (
 		const context = canvas.getContext("2d");
 		if (!context) return;
 
-		setCtx(context);
+		setcontext(context);
 
 		// Set canvas size
 		canvas.width = 400;
@@ -63,46 +64,48 @@ const useVectorPlotter = (
 	}, [canvasRef]);
 
 	const drawVector = useCallback(
-		(vector: Vector, color: string) => {
-			if (!ctx) return;
+		(vector: Vector, color: string, opacity: number) => {
+			if (!context) return;
 
-			const centerX = ctx.canvas.width / 2;
-			const centerY = ctx.canvas.height / 2;
+			const centerX = context.canvas.width / 2;
+			const centerY = context.canvas.height / 2;
 
-			ctx.beginPath();
-			ctx.moveTo(centerX, centerY);
-			ctx.lineTo(centerX + vector.x * scale, centerY - vector.y * scale);
-			ctx.strokeStyle = color;
-			ctx.stroke();
+			context.beginPath();
+			context.moveTo(centerX, centerY);
+			context.lineTo(centerX + vector.x * scale, centerY - vector.y * scale);
+			context.strokeStyle = color;
+			context.globalAlpha = opacity;
+			context.stroke();
 		},
-		[ctx, scale],
+		[context, scale],
 	);
 
 	const drawConnection = useCallback(
 		(v1: Vector, v2: Vector, color = "black") => {
-			if (!ctx) return;
+			if (!context) return;
 
-			const centerX = ctx.canvas.width / 2;
-			const centerY = ctx.canvas.height / 2;
+			const centerX = context.canvas.width / 2;
+			const centerY = context.canvas.height / 2;
 
-			ctx.beginPath();
-			ctx.moveTo(centerX + v1.x * scale, centerY - v1.y * scale);
-			ctx.lineTo(centerX + v2.x * scale, centerY - v2.y * scale);
-			ctx.strokeStyle = color;
-			ctx.stroke();
+			context.beginPath();
+			context.moveTo(centerX + v1.x * scale, centerY - v1.y * scale);
+			context.lineTo(centerX + v2.x * scale, centerY - v2.y * scale);
+			context.strokeStyle = color;
+			context.globalAlpha = 1;
+			context.stroke();
 		},
-		[ctx, scale],
+		[context, scale],
 	);
 
 	useEffect(() => {
-		if (!ctx) return;
+		if (!context) return;
 
-		ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-		drawCoordinateSystem(ctx);
+		context.clearRect(0, 0, context.canvas.width, context.canvas.height);
+		drawGrid(context);
 
 		for (const shape of shapes) {
 			for (let i = 0; i < shape.length; i++) {
-				drawVector(shape[i].vector, shape[i].color);
+				drawVector(shape[i].vector, shape[i].color || "black", 0.35);
 			}
 
 			const connectionColor =
@@ -112,16 +115,35 @@ const useVectorPlotter = (
 				drawConnection(shape[i].vector, shape[i + 1].vector, connectionColor);
 			}
 		}
-	}, [ctx, shapes, drawVector, drawConnection, selectedShape]);
+	}, [context, shapes, drawVector, drawConnection, selectedShape]);
 
-	const drawCoordinateSystem = (context: CanvasRenderingContext2D) => {
+	// const drawCoordinateSystem = (context: CanvasRenderingContext2D) => {
+	// 	const { width, height } = context.canvas;
+	// 	context.beginPath();
+	// 	context.moveTo(width / 2, 0);
+	// 	context.lineTo(width / 2, height);
+	// 	context.moveTo(0, height / 2);
+	// 	context.lineTo(width, height / 2);
+	// 	context.strokeStyle = "blue";
+	// 	context.globalAlpha = 0.5;
+	// 	context.stroke();
+	// };
+
+	const drawGrid = (context: CanvasRenderingContext2D) => {
 		const { width, height } = context.canvas;
+		const step = 10;
+
 		context.beginPath();
-		context.moveTo(width / 2, 0);
-		context.lineTo(width / 2, height);
-		context.moveTo(0, height / 2);
-		context.lineTo(width, height / 2);
-		context.strokeStyle = "black";
+		for (let x = step; x < width; x += step) {
+			context.moveTo(x, 0);
+			context.lineTo(x, height);
+		}
+		for (let y = step; y < height; y += step) {
+			context.moveTo(0, y);
+			context.lineTo(width, y);
+		}
+		context.strokeStyle = "lightgray";
+		context.globalAlpha = 0.5;
 		context.stroke();
 	};
 
@@ -204,9 +226,9 @@ const useVectorPlotter = (
 	};
 
 	const addVector = useCallback(
-		(shapeIndex: number, vector: Vector, color = "lightgray") => {
+		(shapeIndex: number, vector: Vector, color = "lightgray", opacity = 1) => {
 			const newShapes = [...shapes];
-			newShapes[shapeIndex].push({ vector, color });
+			newShapes[shapeIndex].push({ vector, color, opacity });
 			setShapes(newShapes);
 		},
 		[shapes],
@@ -221,11 +243,11 @@ const useVectorPlotter = (
 	};
 
 	const transformPixelToVector = (x: number, y: number): Vector => {
-		if (!ctx) {
+		if (!context) {
 			return createVector(0, 0);
 		}
-		const centerX = ctx.canvas.width / 2;
-		const centerY = ctx.canvas.height / 2;
+		const centerX = context.canvas.width / 2;
+		const centerY = context.canvas.height / 2;
 
 		return createVector((x - centerX) / scale, (centerY - y) / scale);
 	};

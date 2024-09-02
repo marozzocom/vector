@@ -6,6 +6,7 @@ import {
 	ArrowBigLeft,
 	ArrowBigRight,
 	ArrowBigUp,
+	CircleOff,
 	Copy,
 	Download,
 	Expand,
@@ -42,11 +43,12 @@ const debounce = <T extends unknown[]>(
 };
 
 const DEFAULT_ZOOM = 50;
+const ZOOM_STEP = 5;
 const TRANSLATION_STEP = 0.5;
 const DEBOUNCE_RATE = 7;
 
 const Separator = styled.div`
-	border-left: 1px solid #ddd;
+	border-left: 1px solid rgb(0, 0, 0, 0.25);
 	height: 1rem;
 `;
 
@@ -60,18 +62,23 @@ const Panel = styled.div`
 	display: flex;
 	justify-content: center;
 	gap: 1rem;
-	background-color: #f0f0f0;
+	background-color: rgba(220, 220, 220, 0.75);
+	box-shadow: 0 0 0.5rem rgba(0, 0, 0, 0.05);
 	border-radius: 1rem;
 	min-height: 2rem;
 	flex-wrap: wrap;
 	padding: 1rem;
 	align-items: center;
+	backdrop-filter: blur(0.5rem);
 `;
 
 const PanelContainer = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: 1rem;
+	position: sticky;
+	top: 0;
+	min-height: 250px;
 `;
 
 const StyledCanvas = styled.canvas`
@@ -81,7 +88,7 @@ const StyledCanvas = styled.canvas`
 const Layout = styled.div`
 	display: flex;
 	flex-direction: column;
-	height: 100vh;
+	min-height: 100vh;
 `;
 
 const StyledButton = styled.button<{
@@ -116,9 +123,11 @@ const App = () => {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const [zoom, setZoom] = useState(DEFAULT_ZOOM);
 	const [exportOpen, setExportOpen] = useState(false);
-	const [drawingMode, setDrawingMode] = useState<"point" | "freehand">("point");
+	const [drawingMode, setDrawingMode] = useState<"point" | "freehand">(
+		"freehand",
+	);
 
-	const debounceRef = useRef<((e: MouseEvent) => void) | null>();
+	const debounceRef = useRef<((e: PointerEvent) => void) | null>();
 
 	const toggleExport = () => setExportOpen((prev) => !prev);
 
@@ -140,8 +149,13 @@ const App = () => {
 	} = useVectorPlotter(canvasRef, zoom);
 
 	const handleAddShape = () => {
+		if (shapes[shapes.length - 1]?.length === 0) {
+			return;
+		}
+
 		const index = addShape();
 		selectShape(index);
+		resetDebounce();
 	};
 
 	const handleRemoveShape = () => {
@@ -154,36 +168,46 @@ const App = () => {
 			return;
 		}
 
+		if (shapes.length > 1) {
+			selectShape(selectedShape - 1);
+		} else {
+			deselectShape();
+		}
+
 		removeShape(selectedShape);
+		resetDebounce();
 	};
 
 	const debouncedHandleFreehandDrawing = useCallback(
-		(event: MouseEvent) => {
-			if (!debounceRef.current) {
-				debounceRef.current = debounce((e: MouseEvent) => {
-					if (!canvasRef.current || selectedShape === null) return;
-
-					const xInRelationToCanvas = e.clientX - canvasRef.current.offsetLeft;
-					const yInRelationToCanvas = e.clientY - canvasRef.current.offsetTop;
-
-					const vector = transformPixelToVector(
-						xInRelationToCanvas,
-						yInRelationToCanvas,
-					);
-
-					addVector(selectedShape, vector);
-				}, DEBOUNCE_RATE);
+		(event: PointerEvent) => {
+			if (debounceRef.current) {
+				debounceRef.current(event);
+				return;
 			}
-			debounceRef.current(event);
+
+			debounceRef.current = debounce((e: PointerEvent) => {
+				if (!canvasRef.current || selectedShape === null) return;
+
+				const xInRelationToCanvas = e.clientX - canvasRef.current.offsetLeft;
+				const yInRelationToCanvas = e.clientY - canvasRef.current.offsetTop;
+
+				const vector = transformPixelToVector(
+					xInRelationToCanvas,
+					yInRelationToCanvas,
+				);
+
+				addVector(selectedShape, vector);
+			}, DEBOUNCE_RATE);
 		},
 		[selectedShape, transformPixelToVector, addVector],
 	);
 
 	const stopFreehandDrawing = () => {
 		canvasRef.current?.removeEventListener(
-			"mousemove",
+			"pointermove",
 			debouncedHandleFreehandDrawing,
 		);
+		resetDebounce();
 	};
 
 	const handleAddVector: MouseEventHandler<HTMLCanvasElement> = (event) => {
@@ -212,19 +236,20 @@ const App = () => {
 		}
 
 		canvasRef.current.addEventListener(
-			"mousemove",
+			"pointermove",
 			debouncedHandleFreehandDrawing,
 		);
-		window.addEventListener("mouseup", stopFreehandDrawing);
+
+		window.addEventListener("pointerup", stopFreehandDrawing);
+		resetDebounce();
 	};
 
 	const handleClear = () => {
 		deselectShape();
 		clearVectors();
 
-		debounceRef.current = null;
-
 		setZoom(DEFAULT_ZOOM);
+		resetDebounce();
 	};
 
 	const handleMakeSmaller = () => {
@@ -233,6 +258,7 @@ const App = () => {
 		}
 
 		scaleShape(selectedShape, 0.9);
+		resetDebounce();
 	};
 
 	const handleMakeBigger = () => {
@@ -241,6 +267,7 @@ const App = () => {
 		}
 
 		scaleShape(selectedShape, 1.1);
+		resetDebounce();
 	};
 
 	const handleMoveUp = () => {
@@ -249,6 +276,7 @@ const App = () => {
 		}
 
 		translateShape(selectedShape, { x: 0, y: TRANSLATION_STEP });
+		resetDebounce();
 	};
 
 	const handleMoveRight = () => {
@@ -257,6 +285,7 @@ const App = () => {
 		}
 
 		translateShape(selectedShape, { x: TRANSLATION_STEP, y: 0 });
+		resetDebounce();
 	};
 
 	const handleMoveDown = () => {
@@ -265,6 +294,7 @@ const App = () => {
 		}
 
 		translateShape(selectedShape, { x: 0, y: -TRANSLATION_STEP });
+		resetDebounce();
 	};
 
 	const handleMoveLeft = () => {
@@ -273,6 +303,7 @@ const App = () => {
 		}
 
 		translateShape(selectedShape, { x: -TRANSLATION_STEP, y: 0 });
+		resetDebounce();
 	};
 
 	const handleRotateClockwise = () => {
@@ -281,6 +312,7 @@ const App = () => {
 		}
 
 		rotateShape(selectedShape, -Math.PI / 8);
+		resetDebounce();
 	};
 
 	const handleRotateCounterClockwise = () => {
@@ -289,6 +321,7 @@ const App = () => {
 		}
 
 		rotateShape(selectedShape, Math.PI / 8);
+		resetDebounce();
 	};
 
 	const handleDuplicateShape = () => {
@@ -297,6 +330,23 @@ const App = () => {
 		}
 
 		duplicateShape(selectedShape);
+		resetDebounce();
+	};
+
+	const handleZoomIn = () => {
+		setZoom((prev) => prev + ZOOM_STEP);
+
+		resetDebounce();
+	};
+
+	const handleZoomOut = () => {
+		setZoom((prev) => prev - ZOOM_STEP);
+
+		resetDebounce();
+	};
+
+	const resetDebounce = () => {
+		debounceRef.current = null;
 	};
 
 	const choosePoint = () => setDrawingMode("point");
@@ -325,16 +375,10 @@ const App = () => {
 						<Pencil />
 					</StyledButton>
 					<Separator />
-					<StyledButton
-						onClick={() => setZoom((prev) => prev + 5)}
-						type="button"
-					>
+					<StyledButton onClick={handleZoomIn} type="button">
 						<ZoomIn />
 					</StyledButton>
-					<StyledButton
-						onClick={() => setZoom((prev) => prev - 5)}
-						type="button"
-					>
+					<StyledButton onClick={handleZoomOut} type="button">
 						<ZoomOut />
 					</StyledButton>
 					<Separator />
@@ -351,8 +395,11 @@ const App = () => {
 						<StyledTextarea readOnly value={serializeToSVG()} />
 					</Panel>
 				)}
-				{shapes.length > 0 && (
+				{shapes.length > 0 && selectedShape !== undefined && (
 					<Panel>
+						<StyledButton type="button" onClick={deselectShape}>
+							<CircleOff />
+						</StyledButton>
 						{shapes.map((_, index) => (
 							<StyledButton
 								// biome-ignore lint/suspicious/noArrayIndexKey: <explanation>
@@ -405,7 +452,7 @@ const App = () => {
 				)}
 			</PanelContainer>
 			<CanvasContainer>
-				<StyledCanvas ref={canvasRef} onMouseDown={handleAddVector} />
+				<StyledCanvas ref={canvasRef} onPointerDown={handleAddVector} />
 			</CanvasContainer>
 		</Layout>
 	);
