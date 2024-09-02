@@ -63,27 +63,27 @@ const Panel = styled.div`
 	display: flex;
 	justify-content: center;
 	gap: 1rem;
-	background-color: rgba(220, 220, 220, 0.75);
+	background-color: rgb(128 128 24 / 0.45);
 	box-shadow: 0 0 0.5rem rgba(0, 0, 0, 0.05);
 	border-radius: 1rem;
 	min-height: 2rem;
 	flex-wrap: wrap;
 	padding: 1rem;
 	align-items: center;
-	backdrop-filter: blur(0.5rem);
+	backdrop-filter: blur(0.125rem);
 `;
 
 const PanelContainer = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: 1rem;
-	position: sticky;
-	top: 0;
-	min-height: 250px;
+	position: fixed;
+	top: 1rem;
+	left: 1rem;
 `;
 
 const StyledCanvas = styled.canvas`
-  border: 1px solid red;
+  box-shadow: 0 0 8rem 2rem rgb(255 255 255 / 1) inset;
 `;
 
 const Layout = styled.div`
@@ -178,6 +178,12 @@ const App = () => {
 
 		removeShape(selectedShape);
 		resetDebounce();
+	};
+
+	const handleDeselectShape = () => {
+		deselectShape();
+		resetDebounce();
+		setMode("selectShape");
 	};
 
 	const debouncedHandleFreehandDrawing = useCallback(
@@ -458,7 +464,7 @@ const App = () => {
 						<StyledButton onClick={handleDuplicateShape} type="button">
 							<Copy />
 						</StyledButton>
-						<StyledButton type="button" onClick={deselectShape}>
+						<StyledButton type="button" onClick={handleDeselectShape}>
 							<CircleOff />
 						</StyledButton>
 						<Separator />

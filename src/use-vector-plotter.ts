@@ -43,10 +43,11 @@ const useVectorPlotter = (
 	canvasRef: RefObject<HTMLCanvasElement>,
 	scale = 50,
 ) => {
-	const [context, setcontext] = useState<CanvasRenderingContext2D | null>(null);
+	const [context, setContext] = useState<CanvasRenderingContext2D | null>(null);
 	const [shapes, setShapes] = useState<Shapes>([[]]);
 	const [selectedShape, setSelectedShape] = useState<number | null>(0);
 	const [selectedVector, setSelectedVector] = useState<number | null>(null);
+	const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
 
 	const selectShape = (index: number) => {
 		setSelectedShape(index);
@@ -103,19 +104,28 @@ const useVectorPlotter = (
 		const context = canvas.getContext("2d");
 		if (!context) return;
 
-		setcontext(context);
+		setContext(context);
 
-		// Set canvas size
-		canvas.width = 400;
-		canvas.height = 400;
+		const resizeCanvas = () => {
+			canvas.width = window.innerWidth;
+			canvas.height = window.innerHeight;
+			setCanvasSize({ width: canvas.width, height: canvas.height });
+		};
+
+		resizeCanvas();
+		window.addEventListener("resize", resizeCanvas);
+
+		return () => {
+			window.removeEventListener("resize", resizeCanvas);
+		};
 	}, [canvasRef]);
 
 	const drawVector = useCallback(
 		(vector: Vector, color: string, opacity: number) => {
 			if (!context) return;
 
-			const centerX = context.canvas.width / 2;
-			const centerY = context.canvas.height / 2;
+			const centerX = canvasSize.width / 2;
+			const centerY = canvasSize.height / 2;
 
 			context.beginPath();
 			context.moveTo(centerX, centerY);
@@ -124,15 +134,15 @@ const useVectorPlotter = (
 			context.globalAlpha = opacity;
 			context.stroke();
 		},
-		[context, scale],
+		[context, scale, canvasSize],
 	);
 
 	const drawConnection = useCallback(
 		(v1: Vector, v2: Vector, color = "black") => {
 			if (!context) return;
 
-			const centerX = context.canvas.width / 2;
-			const centerY = context.canvas.height / 2;
+			const centerX = canvasSize.width / 2;
+			const centerY = canvasSize.height / 2;
 
 			context.beginPath();
 			context.moveTo(centerX + v1.x * scale, centerY - v1.y * scale);
@@ -141,13 +151,31 @@ const useVectorPlotter = (
 			context.globalAlpha = 1;
 			context.stroke();
 		},
-		[context, scale],
+		[context, scale, canvasSize],
 	);
 
 	useEffect(() => {
 		if (!context) return;
 
-		context.clearRect(0, 0, context.canvas.width, context.canvas.height);
+		const drawGrid = (context: CanvasRenderingContext2D) => {
+			const { width, height } = canvasSize;
+			const step = 10;
+
+			context.beginPath();
+			for (let x = step; x < width; x += step) {
+				context.moveTo(x, 0);
+				context.lineTo(x, height);
+			}
+			for (let y = step; y < height; y += step) {
+				context.moveTo(0, y);
+				context.lineTo(width, y);
+			}
+			context.strokeStyle = "lightgray";
+			context.globalAlpha = 0.5;
+			context.stroke();
+		};
+
+		context.clearRect(0, 0, canvasSize.width, canvasSize.height);
 		drawGrid(context);
 
 		for (const shape of shapes) {
@@ -162,25 +190,7 @@ const useVectorPlotter = (
 				drawConnection(shape[i].vector, shape[i + 1].vector, connectionColor);
 			}
 		}
-	}, [context, shapes, drawVector, drawConnection, selectedShape]);
-
-	const drawGrid = (context: CanvasRenderingContext2D) => {
-		const { width, height } = context.canvas;
-		const step = 10;
-
-		context.beginPath();
-		for (let x = step; x < width; x += step) {
-			context.moveTo(x, 0);
-			context.lineTo(x, height);
-		}
-		for (let y = step; y < height; y += step) {
-			context.moveTo(0, y);
-			context.lineTo(width, y);
-		}
-		context.strokeStyle = "lightgray";
-		context.globalAlpha = 0.5;
-		context.stroke();
-	};
+	}, [context, shapes, drawVector, drawConnection, selectedShape, canvasSize]);
 
 	const calculateCenter = (shape: Array<PlottedVector>): Vector => {
 		const center = shape.reduce(
@@ -281,8 +291,8 @@ const useVectorPlotter = (
 		if (!context) {
 			return createVector(0, 0);
 		}
-		const centerX = context.canvas.width / 2;
-		const centerY = context.canvas.height / 2;
+		const centerX = canvasSize.width / 2;
+		const centerY = canvasSize.height / 2;
 
 		return createVector((x - centerX) / scale, (centerY - y) / scale);
 	};
@@ -349,6 +359,7 @@ const useVectorPlotter = (
 		duplicateShape,
 		serializeToSVG,
 		selectShapeWithPointer,
+		canvasSize,
 	};
 };
 
