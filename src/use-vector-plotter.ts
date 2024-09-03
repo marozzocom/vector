@@ -48,6 +48,24 @@ const useVectorPlotter = (
 	const [selectedShape, setSelectedShape] = useState<number | null>(0);
 	const [selectedVector, setSelectedVector] = useState<number | null>(null);
 	const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
+	const [history, setHistory] = useState<Array<string>>([]);
+
+	const undo = () => {
+		if (history.length === 0) {
+			return;
+		}
+
+		const last = JSON.parse(history[history.length - 1]);
+		setHistory((prev) => prev.slice(0, -1));
+		selectShape(last.length - 1);
+		setShapes(last);
+	};
+
+	const historyPush = () => {
+		setHistory((prev) => {
+			return [...prev, JSON.stringify(shapes)];
+		});
+	};
 
 	const selectShape = (index: number) => {
 		setSelectedShape(index);
@@ -360,6 +378,9 @@ const useVectorPlotter = (
 		serializeToSVG,
 		selectShapeWithPointer,
 		canvasSize,
+		setShapes,
+		undo,
+		historyPush,
 	};
 };
 

@@ -20,6 +20,7 @@ import {
 	RotateCw,
 	Shrink,
 	Trash2,
+	Undo,
 	ZoomIn,
 	ZoomOut,
 } from "lucide-react";
@@ -128,6 +129,8 @@ const App = () => {
 		duplicateShape,
 		serializeToSVG,
 		selectShapeWithPointer,
+		historyPush,
+		undo,
 	} = useVectorPlotter(canvasRef, zoom);
 
 	const toggleMenu = () => setMenuOpen((prev) => !prev);
@@ -137,6 +140,7 @@ const App = () => {
 			return;
 		}
 
+		historyPush();
 		const index = addShape();
 		selectShape(index);
 	};
@@ -147,6 +151,7 @@ const App = () => {
 		}
 
 		if (shapes.length === 1) {
+			historyPush();
 			handleClear();
 			return;
 		}
@@ -157,6 +162,7 @@ const App = () => {
 			deselectShape();
 		}
 
+		historyPush();
 		removeShape(selectedShape);
 	};
 
@@ -187,10 +193,7 @@ const App = () => {
 			const { x, y } = getCoordinates(event);
 			const vector = transformPixelToVector(x, y);
 
-			// requestAnimationFrame(() => {
 			addVector(selectedShape, vector);
-			// Add any additional redraw logic here if needed
-			// });
 
 			if (event.cancelable) {
 				event.preventDefault();
@@ -250,11 +253,14 @@ const App = () => {
 				yInRelationToCanvas,
 			);
 
+			historyPush();
 			addVector(selectedShape, vector);
+
 			return;
 		}
 
 		if (mode === "freehand") {
+			historyPush();
 			startFreehandDrawing();
 			window.addEventListener("pointerup", stopFreehandDrawing, { once: true });
 			window.addEventListener("touchend", stopFreehandDrawing, { once: true });
@@ -262,6 +268,7 @@ const App = () => {
 	};
 
 	const handleClear = () => {
+		historyPush();
 		selectShape(0);
 		clearVectors();
 
@@ -273,6 +280,7 @@ const App = () => {
 			return;
 		}
 
+		historyPush();
 		scaleShape(selectedShape, 0.9);
 	};
 
@@ -281,6 +289,7 @@ const App = () => {
 			return;
 		}
 
+		historyPush();
 		scaleShape(selectedShape, 1.1);
 	};
 
@@ -289,6 +298,7 @@ const App = () => {
 			return;
 		}
 
+		historyPush();
 		translateShape(selectedShape, { x: 0, y: TRANSLATION_STEP });
 	};
 
@@ -297,6 +307,7 @@ const App = () => {
 			return;
 		}
 
+		historyPush();
 		translateShape(selectedShape, { x: TRANSLATION_STEP, y: 0 });
 	};
 
@@ -305,6 +316,7 @@ const App = () => {
 			return;
 		}
 
+		historyPush();
 		translateShape(selectedShape, { x: 0, y: -TRANSLATION_STEP });
 	};
 
@@ -313,6 +325,7 @@ const App = () => {
 			return;
 		}
 
+		historyPush();
 		translateShape(selectedShape, { x: -TRANSLATION_STEP, y: 0 });
 	};
 
@@ -321,6 +334,7 @@ const App = () => {
 			return;
 		}
 
+		historyPush();
 		rotateShape(selectedShape, -Math.PI / 8);
 	};
 
@@ -329,6 +343,7 @@ const App = () => {
 			return;
 		}
 
+		historyPush();
 		rotateShape(selectedShape, Math.PI / 8);
 	};
 
@@ -336,6 +351,7 @@ const App = () => {
 		if (selectedShape === null) {
 			return;
 		}
+		historyPush();
 
 		duplicateShape(selectedShape);
 	};
@@ -375,6 +391,9 @@ const App = () => {
 							<Menu />
 						</StyledButton>
 						<Separator />
+						<StyledButton onClick={undo} type="button">
+							<Undo />
+						</StyledButton>
 						<StyledButton onClick={handleAddShape} type="button">
 							<Plus />
 						</StyledButton>
